@@ -1,0 +1,47 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            // Bare-metal RISC-V debugging via the ESP32-C3 built-in USB-JTAG.
+            // cppdbg launches OpenOCD itself, waits for it to listen, then
+            // connects riscv32-esp-elf-gdb to it.  Requires the WinUSB driver
+            // on "USB JTAG/serial debug unit (Interface 2)" (install via Zadig).
+            "name": "Debug blink (USB-JTAG)",
+            "type": "cppdbg",
+            "request": "launch",
+            "cwd": "${workspaceFolder}",
+            "program": "${workspaceFolder}/blink.elf",
+
+            "MIMode": "gdb",
+            "miDebuggerPath": "C:/Users/Victor/.espressif/tools/riscv32-esp-elf-gdb/16.3_20250913/riscv32-esp-elf-gdb/bin/riscv32-esp-elf-gdb.exe",
+
+            // --- OpenOCD as the GDB server (built-in USB-JTAG) ---
+            "debugServerPath": "C:/Users/Victor/.espressif/tools/openocd-esp32/v0.12.0-esp32-20251215/openocd-esp32/bin/openocd.exe",
+            "debugServerArgs": "-s \"C:/Users/Victor/.espressif/tools/openocd-esp32/v0.12.0-esp32-20251215/openocd-esp32/share/openocd/scripts\" -f board/esp32c3-builtin.cfg",
+            "serverStarted": "Listening on port 3333",
+            "filterStderr": true,
+            "filterStdout": true,
+            "miDebuggerServerAddress": "localhost:3333",
+
+            // Rebuild + flash the current code before each session so the .elf
+            // symbols match what's actually running.  Remove if you prefer to
+            // flash manually (e.g. when only attaching).
+            "preLaunchTask": "flash",
+
+            // Halt at connect; then reset the chip and stop on _start so you
+            // can single-step from the very first instruction.
+            "stopAtConnect": true,
+            "setupCommands": [
+                { "text": "set remote hardware-breakpoint-limit 4", "ignoreFailures": true },
+                { "text": "set mem inaccessible-by-default off", "ignoreFailures": true }
+            ],
+            "postRemoteConnectCommands": [
+                { "text": "monitor reset halt", "ignoreFailures": false },
+                { "text": "thbreak _start", "ignoreFailures": true },
+                { "text": "continue", "ignoreFailures": true }
+            ],
+
+            "logging": { "engineLogging": false, "trace": false }
+        }
+    ]
+}

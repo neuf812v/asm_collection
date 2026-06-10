@@ -1,0 +1,28 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "blink: build",
+            "type": "shell",
+            "command": "mingw32-make",
+            "options": { "cwd": "${workspaceFolder}/RISC-V/blink" },
+            "problemMatcher": ["$gcc"],
+            "group": { "kind": "build", "isDefault": true }
+        },
+        {
+            "label": "blink: flash",
+            "type": "shell",
+            "command": "mingw32-make flash PORT=COM13",
+            "options": { "cwd": "${workspaceFolder}/RISC-V/blink" },
+            "dependsOn": "blink: build",
+            "problemMatcher": []
+        },
+        {
+            "label": "blink: erase",
+            "type": "shell",
+            "command": "mingw32-make erase PORT=COM13",
+            "options": { "cwd": "${workspaceFolder}/RISC-V/blink" },
+            "problemMatcher": []
+        }
+    ]
+}

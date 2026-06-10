@@ -1,0 +1,30 @@
+{
+    "files.associations": {
+        "*.S": "riscv",
+        "*.s": "riscv"
+    },
+    "editor.tokenColorCustomizations": {
+        "textMateRules": [
+            {
+                "scope": "support.function.riscv",
+                "settings": { "foreground": "#61AFEF" }
+            },
+            {
+                "scope": "variable.other.register.usable.by-name.riscv",
+                "settings": { "foreground": "#E06C75" }
+            },
+            {
+                "scope": ["storage.type.riscv", "storage.modifier.riscv"],
+                "settings": { "foreground": "#C678DD" }
+            },
+            {
+                "scope": "entity.name.function.label.riscv",
+                "settings": { "foreground": "#E5C07B", "fontStyle": "bold" }
+            },
+            {
+                "scope": "storage.relocation.riscv",
+                "settings": { "foreground": "#56B6C2" }
+            }
+        ]
+    }
+}

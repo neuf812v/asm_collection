@@ -1,0 +1,19 @@
+{
+    "configurations": [
+        {
+            "name": "ESP32-C3 RISC-V",
+            "includePath": [
+                "${workspaceFolder}/include",
+                "C:/Users/Victor/.platformio/packages/framework-espidf/components/soc/esp32c3/include",
+                "C:/Users/Victor/.platformio/packages/framework-espidf/components/soc/esp32c3/register",
+                "C:/Users/Victor/.platformio/packages/framework-espidf/components/esp_common/include",
+                "C:/Users/Victor/.platformio/packages/framework-espidf/components/soc/include"
+            ],
+            "defines": [],
+            "compilerPath": "C:/Users/Victor/.espressif/tools/riscv32-esp-elf/esp-14.2.0_20251107/riscv32-esp-elf/bin/riscv32-esp-elf-gcc.exe",
+            "cStandard": "c11",
+            "intelliSenseMode": "gcc-arm"
+        }
+    ],
+    "version": 4
+}

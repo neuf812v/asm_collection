@@ -1,0 +1,6 @@
+{
+    // ESP32-C3 peripheral register definitions (GPIO, TIMG, RTC_CNTL, IO_MUX, …).
+    // Used by the "ESP-IDF: Peripheral Viewer" tree in the Run and Debug sidebar.
+    // SVD from https://github.com/espressif/svd (svd/esp32c3.svd).
+    "idf.svdFilePath": "${workspaceFolder}/RISC-V/esp32c3.svd"
+}
