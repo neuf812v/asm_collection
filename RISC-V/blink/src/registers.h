@@ -23,6 +23,19 @@
 #define BLINK_GPIO   2
 #define BLINK_MASK   (1 << BLINK_GPIO)
 
+/* System clock — switch the CPU from the 40 MHz XTAL to the BBPLL.
+ * The ROM leaves the BBPLL running at 480 MHz (PLL_FREQ_SEL=1) but clocks the
+ * CPU from XTAL (SOC_CLK_SEL=0).  Selecting PLL with CPUPERIOD_SEL=1 gives
+ * 480/3 = 160 MHz.  See clk.S.
+ *   CPU_PER_CONF.CPUPERIOD_SEL [1:0] : 0=80 MHz, 1=160 MHz
+ *   SYSCLK_CONF.SOC_CLK_SEL    [11:10]: 0=XTAL, 1=PLL, 2=RC_FAST */
+#define SYSTEM_CPU_PER_CONF_REG   0x600C0008
+#define SYSTEM_SYSCLK_CONF_REG    0x600C0058
+#define SYSTEM_CPUPERIOD_SEL_MASK 0x3
+#define SYSTEM_CPUPERIOD_160M     0x1
+#define SYSTEM_SOC_CLK_SEL_MASK   (0x3 << 10)
+#define SYSTEM_SOC_CLK_SEL_PLL    (0x1 << 10)
+
 /* USB-Serial-JTAG — the chip's on-chip USB CDC, exposed as the native-USB COM
  * port (COM13).  Used for printf-style debug output straight from asm, on the
  * same cable as flashing/JTAG.  See uart.S.
@@ -33,7 +46,7 @@
 #define USB_SERIAL_JTAG_WR_DONE          (1 << 0)
 #define USB_SERIAL_JTAG_IN_EP_DATA_FREE  (1 << 1)
 
-/* Blink half-period.  In direct boot the CPU runs at the ROM default clock
- * and code executes XIP from flash, so the busy loop is ~200 ns/iteration
- * (measured: 40,000,000 iters = 8.0 s).  2,500,000 iters ≈ 0.5 s. */
-#define DELAY_CYCLES  2500000
+/* Blink half-period at 160 MHz (see clk.S).  Calibrated against the UART tick
+ * interval: with the loop fully in I-cache the busy loop runs ~4 CPU cycles per
+ * iteration, so 20,000,000 iters ≈ 0.5 s (measured ~0.5 s half-period). */
+#define DELAY_CYCLES  20000000

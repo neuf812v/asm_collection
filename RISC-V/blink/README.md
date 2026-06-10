@@ -64,9 +64,11 @@ table involved.
 | File | Purpose |
 |------|---------|
 | `link.ld` | Linker script — `.text`/`.rodata` in XIP flash `0x42000000`, `.bss`+stack in DRAM |
-| `src/startup.S` | Direct Boot magic + `_start`: disable all watchdogs, set up stack, zero BSS, call `app_main` |
-| `src/blink.S` | `app_main`: route GPIO2, enable output, toggle with busy-loop delays |
-| `src/registers.h` | Register addresses, watchdog keys, `DELAY_CYCLES`, `BLINK_*` |
+| `src/startup.S` | Direct Boot magic + `_start`: disable watchdogs, switch to 160 MHz, set up stack, zero BSS, greet, call `app_main` |
+| `src/clk.S` | `clk_init_160m`: switch the CPU clock from the 40 MHz XTAL to PLL/3 = 160 MHz |
+| `src/blink.S` | `app_main`: route GPIO2, enable output, print a tick counter, toggle with busy-loop delays |
+| `src/uart.S` | `uart_putc/puts/puthex`: console output over the USB-Serial-JTAG (native-USB COM port) |
+| `src/registers.h` | Register addresses, watchdog/clock keys, `DELAY_CYCLES`, `BLINK_*` |
 | `Makefile` | Build (`objcopy`), `flash` (0x0), `erase`, `dis` |
 
 ---
@@ -77,10 +79,11 @@ table involved.
    `0xE9` ESP-image magic), so the ROM takes the **Direct Boot** path.
 2. It sees the magic `0xAEDB041D` twice in the first 8 bytes, maps flash to
    `0x42000000`, and jumps to offset 8 → `0x42000008`, where `_start` lives.
-3. `_start` disables **TIMG0, TIMG1, RTC and Super** watchdogs, sets up the
-   stack, zeroes `.bss`, and calls `app_main`.
-4. `app_main` routes GPIO2 through IO_MUX, enables output, and toggles it with
-   calibrated busy-loop delays.
+3. `_start` disables **TIMG0, TIMG1, RTC and Super** watchdogs, switches the CPU
+   to **160 MHz** (`clk_init_160m`), sets up the stack, zeroes `.bss`, prints a
+   greeting, and calls `app_main`.
+4. `app_main` routes GPIO2 through IO_MUX, enables output, prints a tick counter
+   over the USB-Serial-JTAG, and toggles GPIO2 with calibrated busy-loop delays.
 
 The two magic words are emitted at the very start of `.text.entry` in
 `startup.S`, guaranteeing `_start` lands exactly at `0x42000008`.
@@ -93,16 +96,24 @@ The two magic words are emitted at the very start of `.text.entry` in
 
 ## Timing
 
-In Direct Boot the CPU runs at the ROM default clock and code executes XIP from
-flash, so the delay loop measures **~200 ns per iteration**:
+`_start` switches the CPU to **160 MHz** (PLL/3) via `clk_init_160m`, so timing
+is deterministic.  With the busy loop running entirely from I-cache (~4 CPU
+cycles per iteration) the delay was calibrated against the UART tick interval:
 
 | `DELAY_CYCLES` | Half-period | Full period |
 |---|---|---|
-| `40 000 000` | 8.0 s | 16 s |
-| `2 500 000` (current) | 0.5 s | **1.0 s** (≈1 Hz) |
+| `20 000 000` (current) | 0.5 s | **1.0 s** (≈1 Hz, measured 1001 ms) |
 
-For deterministic timing, configure the CPU PLL (160 MHz) explicitly — not done
-here to keep the example minimal.
+The ROM leaves the BBPLL running at 480 MHz (it is needed for USB), so the clock
+switch is just two register writes — select the 160 MHz divider and switch the
+CPU source from XTAL to PLL; no PLL bring-up is required.
+
+## Serial console
+
+`app_main` prints `tick <hex>` once per cycle over the **USB-Serial-JTAG**
+(the native-USB COM port), via `uart.S`.  Open a serial monitor at 115200 baud
+on that port to see it.  Stop the monitor before flashing/debugging — it holds
+the port.
 
 ---
 

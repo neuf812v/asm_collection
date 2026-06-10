@@ -32,15 +32,19 @@ INCLUDES  := \
     -I$(IDF)/components/esp_common/include \
     -I$(IDF)/components/soc/include
 
-SRCS := src/startup.S src/blink.S src/uart.S
+SRCS := src/startup.S src/clk.S src/blink.S src/uart.S
 PORT ?= COM3
 
 .PHONY: all flash erase dis clean
 
 all: blink.bin
 
-blink.elf: $(SRCS)
-	$(CC) $(ARCH) $(CFLAGS) $(INCLUDES) $(LDFLAGS) -Wl,-Map=blink.map -o $@ $^
+# Headers are prerequisites (so edits to registers.h trigger a rebuild) but are
+# passed to the compiler via $(SRCS), not $^, so they aren't compiled directly.
+HEADERS := $(wildcard src/*.h)
+
+blink.elf: $(SRCS) $(HEADERS) link.ld
+	$(CC) $(ARCH) $(CFLAGS) $(INCLUDES) $(LDFLAGS) -Wl,-Map=blink.map -o $@ $(SRCS)
 	@echo "[ELF] $@"
 
 # Direct boot: produce a RAW flash image (no ESP image header, no elf2image).

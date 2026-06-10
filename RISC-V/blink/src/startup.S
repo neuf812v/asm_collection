@@ -54,6 +54,10 @@ _start:
     li   t0, RTC_CNTL_SWD_WPROTECT_REG   # re-lock
     sw   zero, 0(t0)
 
+    # ── 3c. Switch CPU to 160 MHz (PLL) ──
+    # Self-contained (t0-t2, no stack), so it is fine to call here.
+    call clk_init_160m
+
     # ── 4. Set up stack ──
     la   sp, _stack_top
 

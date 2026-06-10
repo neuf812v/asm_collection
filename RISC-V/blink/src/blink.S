@@ -13,9 +13,8 @@
     .global  app_main
     .type    app_main, @function
 
-# Note: app_main never returns, so it omits a prologue.  It keeps the tick
-# counter in s0 (a saved register) because t0-t2 are clobbered by the uart_*
-# calls; s0 survives across them.
+# Clean, symmetric blink.  No serial output in the timing path — that distorts
+# the period (see uart.S / the timer-interrupt version for live output).
 app_main:
     # Route GPIO2 pad through GPIO matrix (IO_MUX MCU_SEL = 1)
     li   t0, IO_MUX_GPIO2_REG
@@ -27,18 +26,7 @@ app_main:
     li   t1, BLINK_MASK
     sw   t1, 0(t0)
 
-    li   s0, 0                  # s0 = tick counter
-
 .loop:
-    # Print "tick <hex>\r\n" over USB-Serial-JTAG (COM13)
-    la   a0, msg_tick
-    call uart_puts
-    mv   a0, s0
-    call uart_puthex
-    la   a0, msg_crlf
-    call uart_puts
-    addi s0, s0, 1
-
     # LED ON
     li   t0, GPIO_OUT_W1TS_REG
     li   t1, BLINK_MASK
@@ -62,9 +50,3 @@ app_main:
     bnez t2, .delay_off
 
     j    .loop
-
-    .section .rodata
-msg_tick:
-    .asciz "tick "
-msg_crlf:
-    .asciz "\r\n"
