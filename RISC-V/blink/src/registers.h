@@ -23,6 +23,38 @@
 #define BLINK_GPIO   2
 #define BLINK_MASK   (1 << BLINK_GPIO)
 
+/* ── Hardware timer: TIMG0 Timer0 ──────────────────────────────────────────
+ * Drives the LED from a timer interrupt so blink timing is independent of what
+ * the main loop does (e.g. blocking UART output).  Clock = APB (80 MHz at
+ * 160 MHz CPU) / divider.  divider 80 -> 1 MHz tick; alarm 500000 -> 0.5 s.
+ *
+ * The TIMG_T0_xxx and TIMG_CLK_EN bit macros and GPIO_OUT_REG come from the
+ * included soc headers; only the constants below are project-local. */
+#define TIMG0_T0CONFIG_REG    0x6001F000
+#define TIMG0_T0ALARMLO_REG   0x6001F010
+#define TIMG0_T0ALARMHI_REG   0x6001F014
+#define TIMG0_T0LOADLO_REG    0x6001F018
+#define TIMG0_T0LOADHI_REG    0x6001F01C
+#define TIMG0_T0LOAD_REG      0x6001F020
+#define TIMG0_INT_ENA_REG     0x6001F070
+#define TIMG0_INT_CLR_REG     0x6001F07C
+#define TIMG0_REGCLK_REG      0x6001F0FC
+#define TIMG_T0_INT_BIT       (1 << 0)    /* T0 bit in INT_ENA/CLR/ST */
+#define TIMER_DIVIDER         80          /* 80 MHz / 80 = 1 MHz tick */
+#define TIMER_ALARM_TICKS     500000      /* 500000 us = 0.5 s */
+
+/* ── Interrupt matrix + CPU interrupt controller (core 0) ──────────────────
+ * Route the TIMG0-T0 source to a CPU interrupt line, set it level-triggered
+ * with a priority above the threshold, and enable it. */
+#define INTERRUPT_CORE0_TG_T0_INT_MAP_REG  0x600C2080
+#define INTERRUPT_CORE0_CPU_INT_ENABLE_REG 0x600C2104
+#define INTERRUPT_CORE0_CPU_INT_TYPE_REG   0x600C2108
+#define INTERRUPT_CORE0_CPU_INT_CLEAR_REG  0x600C210C
+#define INTERRUPT_CORE0_CPU_INT_THRESH_REG 0x600C2194
+#define INTERRUPT_PRIO_REG(n)              (0x600C2114 + (n) * 4)
+#define TIMER_CPU_INT_NUM     7            /* CPU interrupt line we use (1..31) */
+#define TIMER_CPU_INT_PRIO    1            /* priority (must exceed threshold 0) */
+
 /* System clock — switch the CPU from the 40 MHz XTAL to the BBPLL.
  * The ROM leaves the BBPLL running at 480 MHz (PLL_FREQ_SEL=1) but clocks the
  * CPU from XTAL (SOC_CLK_SEL=0).  Selecting PLL with CPUPERIOD_SEL=1 gives
@@ -46,7 +78,3 @@
 #define USB_SERIAL_JTAG_WR_DONE          (1 << 0)
 #define USB_SERIAL_JTAG_IN_EP_DATA_FREE  (1 << 1)
 
-/* Blink half-period at 160 MHz (see clk.S).  Calibrated against the UART tick
- * interval: with the loop fully in I-cache the busy loop runs ~4 CPU cycles per
- * iteration, so 20,000,000 iters ≈ 0.5 s (measured ~0.5 s half-period). */
-#define DELAY_CYCLES  20000000

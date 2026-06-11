@@ -66,9 +66,10 @@ table involved.
 | `link.ld` | Linker script — `.text`/`.rodata` in XIP flash `0x42000000`, `.bss`+stack in DRAM |
 | `src/startup.S` | Direct Boot magic + `_start`: disable watchdogs, switch to 160 MHz, set up stack, zero BSS, greet, call `app_main` |
 | `src/clk.S` | `clk_init_160m`: switch the CPU clock from the 40 MHz XTAL to PLL/3 = 160 MHz |
-| `src/blink.S` | `app_main`: route GPIO2, enable output, print a tick counter, toggle with busy-loop delays |
+| `src/timer.S` | `irq_init` + `timer_isr` + vector table: TIMG0 timer interrupt that toggles the LED |
+| `src/blink.S` | `app_main`: route GPIO2, start the timer IRQ, then print a tick counter and `wfi` |
 | `src/uart.S` | `uart_putc/puts/puthex`: console output over the USB-Serial-JTAG (native-USB COM port) |
-| `src/registers.h` | Register addresses, watchdog/clock keys, `DELAY_CYCLES`, `BLINK_*` |
+| `src/registers.h` | Register addresses, watchdog/clock/timer/interrupt constants, `BLINK_*` |
 | `Makefile` | Build (`objcopy`), `flash` (0x0), `erase`, `dis` |
 
 ---
@@ -82,8 +83,8 @@ table involved.
 3. `_start` disables **TIMG0, TIMG1, RTC and Super** watchdogs, switches the CPU
    to **160 MHz** (`clk_init_160m`), sets up the stack, zeroes `.bss`, prints a
    greeting, and calls `app_main`.
-4. `app_main` routes GPIO2 through IO_MUX, enables output, prints a tick counter
-   over the USB-Serial-JTAG, and toggles GPIO2 with calibrated busy-loop delays.
+4. `app_main` routes GPIO2 through IO_MUX, enables output, starts the timer
+   interrupt (`irq_init`), then loops: print a `tick` counter and `wfi`.
 
 The two magic words are emitted at the very start of `.text.entry` in
 `startup.S`, guaranteeing `_start` lands exactly at `0x42000008`.
@@ -94,26 +95,46 @@ The two magic words are emitted at the very start of `.text.entry` in
 
 ---
 
-## Timing
+## Timing — a timer interrupt drives the LED
 
-`_start` switches the CPU to **160 MHz** (PLL/3) via `clk_init_160m`, so timing
-is deterministic.  With the busy loop running entirely from I-cache (~4 CPU
-cycles per iteration) the delay was calibrated against the UART tick interval:
+The LED is toggled inside the **TIMG0 timer ISR**, not by a busy loop.  This
+decouples the blink from the main loop: the LED keeps a perfect 50 %-duty 1 Hz
+square wave (verified on a logic analyzer) even while the main loop does slow,
+blocking work — like printing over a UART that no one is reading.  A busy-loop
+blink cannot do both: blocking I/O in the timing path distorts the period.
 
-| `DELAY_CYCLES` | Half-period | Full period |
-|---|---|---|
-| `20 000 000` (current) | 0.5 s | **1.0 s** (≈1 Hz, measured 1001 ms) |
+`_start` first switches the CPU to **160 MHz** (PLL/3) via `clk_init_160m`.  The
+ROM leaves the BBPLL running at 480 MHz (needed for USB), so the switch is just
+two register writes — select the 160 MHz divider and move the CPU source from
+XTAL to PLL; no PLL bring-up is required.
 
-The ROM leaves the BBPLL running at 480 MHz (it is needed for USB), so the clock
-switch is just two register writes — select the 160 MHz divider and switch the
-CPU source from XTAL to PLL; no PLL bring-up is required.
+### Interrupt path (ESP32-C3)
+
+```
+TIMG0-T0 alarm (0.5 s) ─▶ Interrupt Matrix (route source → CPU int line 7)
+                       ─▶ CPU interrupt controller (enable / level / priority)
+                       ─▶ RISC-V trap (mstatus.MIE) ─▶ mtvec[7] ─▶ timer_isr
+```
+
+Two non-obvious gotchas (both cost real debugging — see `inf/`):
+
+- **Timer clock gate.** `TIMG_TIMER_CLK_IS_ACTIVE` (REGCLK bit 30) defaults to 1
+  and gates the counter. A blind write of `TIMG_CLK_EN` alone clears it and the
+  timer never counts. `timer.S` sets both bits.
+- **mtvec mode.** The ESP32-C3 controller requires **vectored** mtvec
+  (`mtvec | 1`); in direct mode the interrupt is never delivered. `timer.S`
+  installs a 32-entry vector table and points `mtvec` at it.
+
+The ISR toggles GPIO2 via a state flag + `W1TS/W1TC` (it does **not** read-modify
+-write `GPIO_OUT` — under the GPIO-matrix routing that read-back pins the pin HIGH).
 
 ## Serial console
 
-`app_main` prints `tick <hex>` once per cycle over the **USB-Serial-JTAG**
+`app_main` prints `tick <hex>` once per timer tick over the **USB-Serial-JTAG**
 (the native-USB COM port), via `uart.S`.  Open a serial monitor at 115200 baud
 on that port to see it.  Stop the monitor before flashing/debugging — it holds
-the port.
+the port.  Because the LED is on the timer ISR, a missing/slow reader cannot
+disturb the blink.
 
 ---
 

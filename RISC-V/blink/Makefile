@@ -32,7 +32,7 @@ INCLUDES  := \
     -I$(IDF)/components/esp_common/include \
     -I$(IDF)/components/soc/include
 
-SRCS := src/startup.S src/clk.S src/blink.S src/uart.S
+SRCS := src/startup.S src/clk.S src/blink.S src/uart.S src/timer.S
 PORT ?= COM3
 
 .PHONY: all flash erase dis clean
